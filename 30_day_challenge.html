@@ -1,0 +1,291 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>30 Day Challenge Tracker</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .header {
+      background: #6b48ff;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.8rem;
+    }
+    .screen {
+      padding: 30px;
+      display: none;
+    }
+    .active {
+      display: block;
+    }
+    .choice-btn {
+      display: block;
+      width: 100%;
+      padding: 18px;
+      margin: 15px 0;
+      font-size: 1.2rem;
+      background: #6b48ff;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .choice-btn:hover {
+      background: #5838d9;
+      transform: translateY(-2px);
+    }
+    .back-btn {
+      background: #6c757d;
+      margin-bottom: 20px;
+    }
+    .back-btn:hover {
+      background: #5a6268;
+    }
+    .day-header {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin: 8px 0;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+    }
+    .day-header:hover {
+      background: #e9ecef;
+    }
+    .day-header.completed {
+      background: #e8f5e9;
+      text-decoration: line-through;
+      color: #555;
+    }
+    .day-title {
+      font-weight: bold;
+      font-size: 1.15rem;
+      flex: 1;
+    }
+    input[type="checkbox"] {
+      transform: scale(1.4);
+      margin-right: 12px;
+      accent-color: #28a745;
+      cursor: pointer;
+    }
+    .day-content {
+      display: none;
+      padding: 0 16px 16px 16px;
+      background: #fff;
+      border-radius: 0 0 8px 8px;
+      border: 1px solid #e9ecef;
+      border-top: none;
+    }
+    .day-content.open {
+      display: block;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 1rem;
+      margin-top: 10px;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background: #e9ecef;
+      font-weight: bold;
+    }
+    #title {
+      text-transform: capitalize;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <div id="choice-screen" class="screen active">
+    <div class="header">
+      <h1>30 Day Challenge</h1>
+    </div>
+    <div style="padding: 30px;">
+      <button class="choice-btn" data-challenge="abs">Abs Challenge</button>
+      <button class="choice-btn" data-challenge="butt">Butt Challenge</button>
+    </div>
+  </div>
+
+  <div id="challenge-screen" class="screen">
+    <div class="header">
+      <h1 id="title"></h1>
+    </div>
+    <div style="padding: 20px;">
+      <button class="choice-btn back-btn">← Back to selection</button>
+      <div id="days-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ────────────────────────────────────────────────
+const choiceScreen = document.getElementById('choice-screen');
+const challengeScreen = document.getElementById('challenge-screen');
+const titleEl = document.getElementById('title');
+const daysList = document.getElementById('days-list');
+
+let currentChallenge = '';
+
+// Abs plan (from previous version - rest days as strings)
+const absPlan = [
+  [15, 5, 5, 10], [20, 8, 8, 12], [25, 10, 10, 15],
+  "Today is Rest. Take your time off and enjoy your daily routine. Have a good day.",
+  [30, 12, 12, 20], [35, 15, 15, 25], [40, 20, 20, 30],
+  "Today is Rest. Take your time off and enjoy your daily routine. Have a good day.",
+  [40, 30, 30, 35], [50, 50, 30, 38], [55, 65, 33, 42],
+  "Today is Rest. Take your time off and enjoy your daily routine. Have a good day.",
+  [60, 75, 40, 50], [65, 85, 42, 55], [70, 90, 42, 60],
+  "Today is Rest. Take your time off and enjoy your daily routine. Have a good day.",
+  [75, 100, 45, 65], [80, 110, 48, 70], [85, 120, 50, 75],
+  "Today is Rest. Take your time off and enjoy your daily routine. Have a good day.",
+  [90, 130, 52, 80], [95, 140, 55, 85], [100, 150, 58, 90],
+  "Today is Rest. Take your time off and enjoy your daily routine. Have a good day.",
+  [105, 160, 60, 95], [110, 170, 60, 100], [115, 180, 62, 110],
+  "Today is Rest. Take your time off and enjoy your daily routine. Have a good day.",
+  [120, 190, 62, 115], [125, 200, 65, 120]
+];
+
+// Butt plan – all workout days, 3 exercises: [Squat, Hip Bridge, Lunge]
+const buttPlan = [
+  [15, 5, 10], [20, 5, 10], [20, 10, 15], [25, 10, 15], [30, 10, 20],
+  [30, 15, 20], [35, 15, 20], [35, 20, 25], [35, 20, 25], [40, 20, 30],
+  [40, 25, 30], [45, 25, 30], [45, 30, 35], [50, 30, 35], [50, 30, 40],
+  [55, 35, 40], [55, 35, 40], [55, 40, 45], [60, 40, 45], [60, 40, 50],
+  [65, 45, 50], [65, 45, 50], [65, 50, 55], [70, 50, 55], [70, 50, 60],
+  [70, 55, 60], [75, 55, 65], [75, 60, 65], [80, 60, 70], [90, 60, 70]
+];
+
+// ────────────────────────────────────────────────
+document.querySelectorAll('[data-challenge]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentChallenge = btn.dataset.challenge;
+    titleEl.textContent = currentChallenge + ' Challenge';
+
+    choiceScreen.classList.remove('active');
+    challengeScreen.classList.add('active');
+
+    loadDays();
+  });
+});
+
+document.querySelector('.back-btn').addEventListener('click', () => {
+  challengeScreen.classList.remove('active');
+  choiceScreen.classList.add('active');
+});
+
+// ────────────────────────────────────────────────
+function loadDays() {
+  daysList.innerHTML = '';
+
+  const plan = currentChallenge === 'abs' ? absPlan : buttPlan;
+  const exercises = currentChallenge === 'abs' 
+    ? ['Sit Up', 'Crunch', 'Leg Raise', 'Plank'] 
+    : ['Squat', 'Hip Bridge', 'Lunge'];
+
+  for (let day = 1; day <= 30; day++) {
+    const key = `${currentChallenge}_day_${day}`;
+    const isDone = localStorage.getItem(key) === 'true';
+
+    const dayDiv = document.createElement('div');
+
+    const header = document.createElement('div');
+    header.className = 'day-header' + (isDone ? ' completed' : '');
+    header.innerHTML = `
+      <input type="checkbox" ${isDone ? 'checked' : ''}>
+      <span class="day-title">Day ${day}</span>
+      
+    `;
+
+    const content = document.createElement('div');
+    content.className = 'day-content';
+
+    const dayData = plan[day - 1];
+    let contentHtml = '';
+
+    if (typeof dayData === 'string') {
+      // Rest day (only for abs)
+      contentHtml = `<div style="padding:12px; background:#fff3cd; border-radius:6px; color:#856404;">${dayData}</div>`;
+    } else {
+      // Workout day table
+      contentHtml = `
+        <table>
+          <thead>
+            <tr>
+              <th>Exercises</th>
+              <th>Reps</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      dayData.forEach((reps, i) => {
+        let unit = (currentChallenge === 'abs' && i === 3) ? ' sec' : '';
+        contentHtml += `<tr><td>${exercises[i]}</td><td>${reps}${unit}</td></tr>`;
+      });
+
+      contentHtml += `</tbody></table>`;
+    }
+
+    content.innerHTML = contentHtml;
+
+    // Toggle content on header click (ignore checkbox click)
+    header.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+
+      const wasOpen = content.classList.contains('open');
+
+      // Close all others
+      document.querySelectorAll('.day-content.open').forEach(el => el.classList.remove('open'));
+
+      // Toggle this one
+      if (!wasOpen) content.classList.add('open');
+    });
+
+    // Checkbox handler
+    const checkbox = header.querySelector('input');
+    checkbox.addEventListener('change', () => {
+      localStorage.setItem(key, checkbox.checked);
+      header.classList.toggle('completed', checkbox.checked);
+    });
+
+    dayDiv.appendChild(header);
+    dayDiv.appendChild(content);
+    daysList.appendChild(dayDiv);
+  }
+}
+
+</script>
+</body>
+</html>
