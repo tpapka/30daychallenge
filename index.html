@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -121,6 +120,39 @@
     #title {
       text-transform: capitalize;
     }
+    .timer-area {
+      margin-top: 16px;
+      padding: 16px;
+      background: #e9f5ff;
+      border-radius: 10px;
+      text-align: center;
+    }
+    .timer-display {
+      font-size: 3rem;
+      font-weight: bold;
+      margin: 12px 0;
+      letter-spacing: 4px;
+      color: #2c3e50;
+    }
+    .start-btn {
+      padding: 14px 32px;
+      font-size: 1.2rem;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 8px;
+    }
+    .start-btn:disabled {
+      background: #95d5a2;
+      cursor: not-allowed;
+    }
+    .target-time {
+      font-size: 1.1rem;
+      color: #555;
+      margin-bottom: 8px;
+    }
   </style>
 </head>
 <body>
@@ -150,15 +182,14 @@
 </div>
 
 <script>
-// ────────────────────────────────────────────────
-const choiceScreen = document.getElementById('choice-screen');
+const choiceScreen    = document.getElementById('choice-screen');
 const challengeScreen = document.getElementById('challenge-screen');
-const titleEl = document.getElementById('title');
-const daysList = document.getElementById('days-list');
+const titleEl         = document.getElementById('title');
+const daysList        = document.getElementById('days-list');
 
 let currentChallenge = '';
+let plankInterval    = null;
 
-// Abs plan (from previous version - rest days as strings)
 const absPlan = [
   [15, 5, 5, 10], [20, 8, 8, 12], [25, 10, 10, 15],
   "Today is Rest. Take your time off and enjoy your daily routine. Have a good day.",
@@ -177,7 +208,6 @@ const absPlan = [
   [120, 190, 62, 115], [125, 200, 65, 120]
 ];
 
-// Butt plan – all workout days, 3 exercises: [Squat, Hip Bridge, Lunge]
 const buttPlan = [
   [15, 5, 10], [20, 5, 10], [20, 10, 15], [25, 10, 15], [30, 10, 20],
   [30, 15, 20], [35, 15, 20], [35, 20, 25], [35, 20, 25], [40, 20, 30],
@@ -187,31 +217,69 @@ const buttPlan = [
   [70, 55, 60], [75, 55, 65], [75, 60, 65], [80, 60, 70], [90, 60, 70]
 ];
 
-// ────────────────────────────────────────────────
 document.querySelectorAll('[data-challenge]').forEach(btn => {
   btn.addEventListener('click', () => {
     currentChallenge = btn.dataset.challenge;
-    titleEl.textContent = currentChallenge + ' Challenge';
+    titleEl.textContent = currentChallenge.charAt(0).toUpperCase() + currentChallenge.slice(1) + ' Challenge';
 
     choiceScreen.classList.remove('active');
     challengeScreen.classList.add('active');
 
+    if (plankInterval) clearInterval(plankInterval);
     loadDays();
   });
 });
 
 document.querySelector('.back-btn').addEventListener('click', () => {
+  if (plankInterval) clearInterval(plankInterval);
   challengeScreen.classList.remove('active');
   choiceScreen.classList.add('active');
 });
 
-// ────────────────────────────────────────────────
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+function startPlankTimer(display, startBtn) {
+  if (display.dataset.running === 'true') return;
+
+  let remaining = parseInt(display.dataset.remaining, 10);
+  if (remaining <= 0) return;
+
+  display.dataset.running = 'true';
+  startBtn.disabled = true;
+  display.textContent = formatTime(remaining);
+
+  plankInterval = setInterval(() => {
+    remaining--;
+    display.dataset.remaining = remaining;
+    display.textContent = formatTime(remaining);
+
+    if (remaining <= 0) {
+      clearInterval(plankInterval);
+      display.dataset.running = 'false';
+      startBtn.disabled = false;
+      display.style.color = '#28a745'; // green when finished
+    }
+  }, 1000);
+}
+
+function resetPlankTimerForDay(display, target) {
+  if (plankInterval) clearInterval(plankInterval);
+  display.dataset.remaining = target;
+  display.dataset.running = 'false';
+  display.textContent = formatTime(target);
+  display.style.color = '#2c3e50';
+}
+
 function loadDays() {
   daysList.innerHTML = '';
 
   const plan = currentChallenge === 'abs' ? absPlan : buttPlan;
-  const exercises = currentChallenge === 'abs' 
-    ? ['Sit Up', 'Crunch', 'Leg Raise', 'Plank'] 
+  const exercises = currentChallenge === 'abs'
+    ? ['Sit Up', 'Crunch', 'Leg Raise', 'Plank']
     : ['Squat', 'Hip Bridge', 'Lunge'];
 
   for (let day = 1; day <= 30; day++) {
@@ -225,67 +293,116 @@ function loadDays() {
     header.innerHTML = `
       <input type="checkbox" ${isDone ? 'checked' : ''}>
       <span class="day-title">Day ${day}</span>
-      
     `;
 
     const content = document.createElement('div');
     content.className = 'day-content';
 
     const dayData = plan[day - 1];
-    let contentHtml = '';
+    let html = '';
 
     if (typeof dayData === 'string') {
-      // Rest day (only for abs)
-      contentHtml = `<div style="padding:12px; background:#fff3cd; border-radius:6px; color:#856404;">${dayData}</div>`;
+      html = `<div style="padding:12px; background:#fff3cd; border-radius:6px; color:#856404;">${dayData}</div>`;
     } else {
-      // Workout day table
-      contentHtml = `
+      html = `
         <table>
           <thead>
             <tr>
-              <th>Exercises</th>
-              <th>Reps</th>
+              <th>Exercise</th>
+              <th>Target</th>
             </tr>
           </thead>
           <tbody>
       `;
 
-      dayData.forEach((reps, i) => {
-        let unit = (currentChallenge === 'abs' && i === 3) ? ' sec' : '';
-        contentHtml += `<tr><td>${exercises[i]}</td><td>${reps}${unit}</td></tr>`;
+      dayData.forEach((val, i) => {
+        const isPlank = currentChallenge === 'abs' && i === 3;
+        const displayVal = isPlank ? `Hold → (${val} sec)` : `${val}`;
+        const rowStyle = isPlank ? 'cursor:pointer; background:#f0f8ff; font-weight:500;' : '';
+
+        html += `
+          <tr style="${rowStyle}">
+            <td>${exercises[i]}</td>
+            <td>${displayVal}</td>
+          </tr>
+        `;
       });
 
-      contentHtml += `</tbody></table>`;
+      html += `</tbody></table>`;
+
+      if (currentChallenge === 'abs') {
+        const plankSec = dayData[3];
+        html += `
+          <div class="timer-area" style="display:none;">
+            <div class="target-time">Target: ${plankSec} seconds</div>
+            <div class="timer-display" 
+                 id="plank-display-${day}" 
+                 data-target="${plankSec}" 
+                 data-remaining="${plankSec}" 
+                 data-running="false">
+              ${formatTime(plankSec)}
+            </div>
+            <button class="start-btn" id="plank-start-${day}">Start Countdown</button>
+          </div>
+        `;
+      }
     }
 
-    content.innerHTML = contentHtml;
+    content.innerHTML = html;
 
-    // Toggle content on header click (ignore checkbox click)
-    header.addEventListener('click', (e) => {
+    // Toggle day content
+    header.addEventListener('click', e => {
       if (e.target.tagName === 'INPUT') return;
 
       const wasOpen = content.classList.contains('open');
-
-      // Close all others
       document.querySelectorAll('.day-content.open').forEach(el => el.classList.remove('open'));
 
-      // Toggle this one
-      if (!wasOpen) content.classList.add('open');
+      if (!wasOpen) {
+        content.classList.add('open');
+
+        // Reset timer when opening the day
+        if (currentChallenge === 'abs' && typeof dayData !== 'string') {
+          const display = content.querySelector(`#plank-display-${day}`);
+          const target = parseInt(display.dataset.target, 10);
+          resetPlankTimerForDay(display, target);
+
+          const startBtn = content.querySelector(`#plank-start-${day}`);
+          if (startBtn) startBtn.disabled = false;
+        }
+      }
     });
 
-    // Checkbox handler
-    const checkbox = header.querySelector('input');
-    checkbox.addEventListener('change', () => {
-      localStorage.setItem(key, checkbox.checked);
-      header.classList.toggle('completed', checkbox.checked);
+    // Checkbox
+    header.querySelector('input').addEventListener('change', e => {
+      localStorage.setItem(key, e.target.checked);
+      header.classList.toggle('completed', e.target.checked);
     });
+
+    // Plank timer logic (only for abs workout days)
+    if (currentChallenge === 'abs' && typeof dayData !== 'string') {
+      content.addEventListener('click', e => {
+        const tr = e.target.closest('tr');
+        if (tr && tr.cells[0].textContent === 'Plank') {
+          const area = content.querySelector('.timer-area');
+          if (area) {
+            area.style.display = area.style.display === 'none' ? 'block' : 'none';
+          }
+        }
+      });
+
+      const startBtn = content.querySelector(`#plank-start-${day}`);
+      const display  = content.querySelector(`#plank-display-${day}`);
+
+      if (startBtn && display) {
+        startBtn.onclick = () => startPlankTimer(display, startBtn);
+      }
+    }
 
     dayDiv.appendChild(header);
     dayDiv.appendChild(content);
     daysList.appendChild(dayDiv);
   }
 }
-
 </script>
 </body>
 </html>
